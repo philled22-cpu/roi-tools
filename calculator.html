@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Калькулятор оффера</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --panel-2: #334155;
+    --border: #475569;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #3b82f6;
+    --good: #10b981;
+    --bad: #ef4444;
+    --warn: #f59e0b;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 32px 16px;
+  }
+  .container {
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  h1 {
+    font-size: 22px;
+    margin: 0 0 4px;
+  }
+  .sub {
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 24px;
+  }
+  .offer-row {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 24px;
+  }
+  .offer-row input {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 16px;
+    font-weight: 600;
+    flex: 1;
+    max-width: 360px;
+  }
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 20px;
+  }
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px;
+  }
+  .card h2 {
+    margin: 0 0 14px;
+    font-size: 14px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--muted);
+  }
+  .card.result h2 { color: var(--good); }
+  .row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    gap: 10px;
+  }
+  .row:last-child { margin-bottom: 0; }
+  label {
+    flex: 1;
+    font-size: 13px;
+    color: var(--muted);
+  }
+  input[type=number], input[type=text] {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 6px 10px;
+    border-radius: 6px;
+    text-align: right;
+    width: 140px;
+    font-variant-numeric: tabular-nums;
+    font-size: 14px;
+  }
+  input[readonly] {
+    background: transparent;
+    border: 1px dashed var(--border);
+    color: var(--text);
+    font-weight: 600;
+  }
+  .row.derived input { color: var(--accent); }
+  .row.result input {
+    width: 160px;
+    font-size: 16px;
+    font-weight: 700;
+  }
+  .row.result.profit input { color: var(--good); }
+  .row.result.loss input { color: var(--bad); }
+  .unit {
+    font-size: 12px;
+    color: var(--muted);
+    width: 24px;
+    display: inline-block;
+    text-align: left;
+    margin-left: 4px;
+  }
+  .toolbar {
+    margin-top: 24px;
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 10px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 600;
+  }
+  button.ghost {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+  }
+  button:hover { opacity: 0.9; }
+  .note {
+    color: var(--muted);
+    font-size: 12px;
+    margin-top: 6px;
+  }
+  .formula-hint {
+    color: var(--warn);
+    font-size: 11px;
+    margin-top: 4px;
+    font-style: italic;
+  }
+</style>
+</head>
+<body>
+<!-- ============ ПАРОЛЬ-ГЕЙТ ============ -->
+<div id="pwdScreen" style="position:fixed;inset:0;background:#0f172a;display:flex;align-items:center;justify-content:center;z-index:99999;">
+  <div style="background:#1e293b;border:1px solid #475569;border-radius:10px;padding:32px;max-width:400px;width:90%;">
+    <h2 style="color:#e2e8f0;margin:0 0 8px;font-size:18px;">Калькулятор оффера — KZ</h2>
+    <p style="color:#94a3b8;margin:0 0 16px;font-size:13px;">Введи пароль для доступа</p>
+    <input type="password" id="pwdInput" placeholder="Пароль" autofocus
+      style="width:100%;padding:10px;background:#334155;border:1px solid #475569;color:#e2e8f0;border-radius:6px;font-size:14px;box-sizing:border-box;">
+    <div id="pwdError" style="color:#ef4444;font-size:12px;margin-top:8px;display:none;">Неверный пароль</div>
+    <button id="pwdSubmit"
+      style="margin-top:14px;width:100%;background:#3b82f6;color:white;border:none;padding:10px;border-radius:6px;cursor:pointer;font-weight:600;font-size:14px;">Войти</button>
+  </div>
+</div>
+<script>
+(async () => {
+  const PWD_HASH = "0b0dc61570d29a73b48b80fb571e876edac6f61acb1b1bb4de2f27486ab1ca07";
+  const KEY = "calc_auth_v1";
+  async function sha256(t) {
+    const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t));
+    return Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2,'0')).join('');
+  }
+  function unlock() { document.getElementById('pwdScreen').style.display = 'none'; }
+  if (localStorage.getItem(KEY) === PWD_HASH) { unlock(); return; }
+  const onSubmit = async () => {
+    const inp = document.getElementById('pwdInput').value;
+    if (await sha256(inp) === PWD_HASH) {
+      localStorage.setItem(KEY, PWD_HASH);
+      unlock();
+    } else {
+      document.getElementById('pwdError').style.display = 'block';
+    }
+  };
+  document.getElementById('pwdSubmit').addEventListener('click', onSubmit);
+  document.getElementById('pwdInput').addEventListener('keydown', e => { if (e.key === 'Enter') onSubmit(); });
+})();
+</script>
+<!-- ============ /ПАРОЛЬ-ГЕЙТ ============ -->
+
+<div class="container">
+  <h1>Калькулятор оффера</h1>
+  <div class="sub">Введи данные вручную — итоги пересчитаются автоматически. Поля с пунктиром — расчётные, заполнять не надо.</div>
+
+  <div class="offer-row">
+    <label style="flex:0 0 auto; color:var(--muted); font-size:13px;">Название оффера:</label>
+    <input type="text" id="f_name" placeholder="Например: Золотой олень" style="text-align:left;">
+  </div>
+
+  <div class="grid">
+    <!-- ============ ДАННЫЕ ============ -->
+    <div class="card">
+      <h2>Данные</h2>
+
+      <div class="row"><label>Колво апрувов</label><input type="number" id="f_orders" step="1"><span class="unit">шт</span></div>
+      <div class="row"><label>Количество (товаров в заказах)</label><input type="number" id="f_items" step="1"><span class="unit">шт</span></div>
+      <div class="row"><label>Выкуп</label><input type="number" id="f_redeemed" step="1"><span class="unit">шт</span></div>
+      <div class="row"><label>Выкуп % <small style="color:var(--muted)">(можно менять — пересчитает выкуп и выручку)</small></label><input type="text" id="o_redeem_pct" style="color:var(--warn)"><span class="unit">%</span></div>
+      <div class="row"><label>Налог</label><input type="number" id="f_tax_pct" step="0.1" value="12"><span class="unit">%</span></div>
+      <div class="row"><label>Кол во возвратов</label><input type="number" id="f_returns" step="1"><span class="unit">шт</span></div>
+      <div class="row"><label>Сумма продаж (выручка)</label><input type="number" id="f_revenue" step="1"><span class="unit">₸</span></div>
+      <div class="row derived"><label>Цена апрува</label><input type="text" id="o_approval_price" readonly><span class="unit">₸</span></div>
+      <div class="row derived"><label>Цена выкупа</label><input type="text" id="o_redeem_price" readonly><span class="unit">₸</span></div>
+      <div class="row"><label>В пути</label><input type="number" id="f_in_transit" step="1"><span class="unit">шт</span></div>
+      <div class="row derived"><label>Средний чек</label><input type="text" id="o_avg_check" readonly><span class="unit">₸</span></div>
+    </div>
+
+    <!-- ============ РАСХОДЫ ============ -->
+    <div class="card">
+      <h2>Расходы</h2>
+
+      <div class="row"><label>Общая себестоимость</label><input type="number" id="f_cogs" step="1"><span class="unit">₸</span></div>
+      <div class="row derived"><label>Спенд <small style="color:var(--muted)">(13257 × апрувы)</small></label><input type="text" id="o_spend" readonly><span class="unit">₸</span></div>
+      <div class="row derived"><label>Затраты на КЦ <small style="color:var(--muted)">(981 × количество)</small></label><input type="text" id="o_kc" readonly><span class="unit">₸</span></div>
+      <div class="row derived"><label>Стоимость доставки <small style="color:var(--muted)">(2500 × апрувы)</small></label><input type="text" id="o_delivery" readonly><span class="unit">₸</span></div>
+      <div class="row derived"><label>Товаров на возврат <small style="color:var(--muted)">(себестоимость возвратов)</small></label><input type="text" id="o_returns_cogs" readonly><span class="unit">₸</span></div>
+    </div>
+
+    <!-- ============ ИТОГИ ============ -->
+    <div class="card result">
+      <h2>Итоги</h2>
+
+      <div class="row result"><label>Денег после вычета</label><input type="text" id="o_after_tax" readonly><span class="unit">₸</span></div>
+      <div class="formula-hint">выручка × (1 − налог)</div>
+
+      <div class="row result" style="margin-top:14px;"><label>С одной отправки</label><input type="text" id="o_per_shipment" readonly><span class="unit">₸</span></div>
+      <div class="formula-hint">прибыль / апрувы</div>
+
+      <div class="row result profit" style="margin-top:14px;"><label>Прибыль</label><input type="text" id="o_profit" readonly><span class="unit">₸</span></div>
+      <div class="formula-hint">afterTax − все расходы + себес товаров на возврат</div>
+
+      <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border);">
+        <div class="row derived"><label>Все расходы (сумма)</label><input type="text" id="o_total_costs" readonly><span class="unit">₸</span></div>
+        <div class="row derived"><label>ROI</label><input type="text" id="o_roi" readonly><span class="unit">%</span></div>
+      </div>
+
+      <div style="margin-top:16px; padding-top:14px; border-top:1px solid var(--border);">
+        <div style="font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:var(--muted); margin-bottom:10px;">В рублях</div>
+        <div class="row"><label>Курс ₸ за 1 ₽</label><input type="number" id="f_kzt_per_rub" step="0.01" value="6.54"><span class="unit">₸/₽</span></div>
+        <div class="row derived"><label>Денег после вычета</label><input type="text" id="o_after_tax_rub" readonly><span class="unit">₽</span></div>
+        <div class="row derived"><label>С одной отправки</label><input type="text" id="o_per_shipment_rub" readonly><span class="unit">₽</span></div>
+        <div class="row result profit"><label>Прибыль</label><input type="text" id="o_profit_rub" readonly><span class="unit">₽</span></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <button onclick="saveSnapshot()">Сохранить расчёт</button>
+    <button class="ghost" onclick="resetAll()">Очистить</button>
+    <button class="ghost" onclick="exportJSON()">Экспорт JSON</button>
+  </div>
+  <div class="note">Расчёты сохраняются локально в браузере (localStorage). Можно держать несколько снимков и сравнивать.</div>
+</div>
+
+<script>
+// ============================================================
+//   ВХОДНЫЕ ПОЛЯ
+// ============================================================
+const INPUTS = [
+  'f_name',
+  // данные
+  'f_orders','f_items','f_redeemed','f_tax_pct','f_returns','f_revenue','f_in_transit',
+  // расходы
+  'f_cogs',
+  // курс
+  'f_kzt_per_rub',
+];
+
+function num(id) {
+  const raw = (document.getElementById(id).value || '').toString().replace(/\s+/g, '').replace(',', '.');
+  const v = parseFloat(raw);
+  return isNaN(v) ? 0 : v;
+}
+
+// Флаг: если пользователь только что отредактировал «Выкуп %» вручную —
+// recalc не перезаписывает это поле обратно
+let lockRedeemPct = false;
+function fmt(n, digits = 2) {
+  if (!isFinite(n)) return '—';
+  return n.toLocaleString('ru-RU', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+}
+function fmtInt(n) { return fmt(n, 0); }
+
+function setOut(id, val, digits = 2) {
+  document.getElementById(id).value = (val === null || val === undefined) ? '' : fmt(val, digits);
+}
+
+// ============================================================
+//   ПЕРЕСЧЁТ. Формулы помечены TODO — пользователь продиктует.
+// ============================================================
+function recalc() {
+  // f_orders в этом калькуляторе = «Колво апрувов»
+  const apruvy   = num('f_orders');
+  const items    = num('f_items');
+  const redeemed = num('f_redeemed');
+  const taxPct   = num('f_tax_pct');
+  const returns  = num('f_returns');
+  const revenue  = num('f_revenue');
+  const inTransit= num('f_in_transit');
+
+  const cogs = num('f_cogs');
+
+  // Спенд = 13257 × апрувы
+  const spend = 13257 * apruvy;
+  setOut('o_spend', spend, 0);
+
+  // Стоимость доставки = 2500 × апрувы (ФФ и доставка возвратов уже включены)
+  const delivery = 2500 * apruvy;
+  setOut('o_delivery', delivery, 0);
+
+  // Затраты на КЦ = 981 × количество товаров
+  const kc = 981 * items;
+  setOut('o_kc', kc, 0);
+
+  // ── ПРОИЗВОДНЫЕ ─────────────────────────────────
+  // Выкуп % = выкуп / апрувы × 100 (не перезаписываем, если пользователь только что менял %)
+  const redeemPct = apruvy > 0 ? (redeemed / apruvy) * 100 : 0;
+  if (!lockRedeemPct) setOut('o_redeem_pct', redeemPct, 1);
+
+  // Средний чек = выручка / выкупы (выручка приходит только от выкупленных)
+  const avgCheck = redeemed > 0 ? revenue / redeemed : 0;
+  setOut('o_avg_check', avgCheck, 2);
+
+  // Цена апрува = спенд / апрувы
+  const approvalPrice = apruvy > 0 ? spend / apruvy : 0;
+  setOut('o_approval_price', approvalPrice, 2);
+
+  // Цена выкупа = спенд / выкуп
+  const redeemPrice = redeemed > 0 ? spend / redeemed : 0;
+  setOut('o_redeem_price', redeemPrice, 2);
+
+  // Товаров на возврат (себестоимость возвращённого товара)
+  // = Общая себестоимость / (выкуп + возвраты + в пути) × возвраты
+  const sentUnits = redeemed + returns + inTransit;
+  const unitCogs = sentUnits > 0 ? cogs / sentUnits : 0;
+  const returnsCogs = unitCogs * returns;
+  setOut('o_returns_cogs', returnsCogs, 2);
+
+  // ── ИТОГИ ───────────────────────────────────────
+  // Денег после вычета = выручка × (1 − налог)
+  const afterTax = revenue * (1 - taxPct / 100);
+  setOut('o_after_tax', afterTax, 2);
+
+  // Все расходы (без «товаров на возврат», т.к. в формуле прибыли они отдельно прибавляются)
+  const totalCosts = cogs + spend + kc + delivery;
+  setOut('o_total_costs', totalCosts, 0);
+
+  // Прибыль = afterTax − все расходы + себес товаров на возврат
+  const profit = afterTax - totalCosts + returnsCogs;
+  setOut('o_profit', profit, 2);
+
+  // С одной отправки = прибыль / апрувы
+  const perShipment = apruvy > 0 ? profit / apruvy : 0;
+  setOut('o_per_shipment', perShipment, 4);
+
+  // ROI = прибыль / спенд × 100
+  const roi = spend > 0 ? (profit / spend) * 100 : 0;
+  setOut('o_roi', roi, 1);
+
+  // Подкрашиваем прибыль зелёным/красным
+  const profitRow = document.getElementById('o_profit').parentElement;
+  profitRow.classList.remove('profit','loss');
+  profitRow.classList.add(profit >= 0 ? 'profit' : 'loss');
+
+  // ── ПЕРЕСЧЁТ В РУБЛИ ───────────────────────────
+  const kztPerRub = num('f_kzt_per_rub') || 1;
+  setOut('o_after_tax_rub', afterTax / kztPerRub, 2);
+  setOut('o_per_shipment_rub', perShipment / kztPerRub, 2);
+  setOut('o_profit_rub', profit / kztPerRub, 2);
+  const profitRubRow = document.getElementById('o_profit_rub').parentElement;
+  profitRubRow.classList.remove('profit','loss');
+  profitRubRow.classList.add(profit >= 0 ? 'profit' : 'loss');
+
+  saveDraft();
+}
+
+// ============================================================
+//   ЛОКАЛЬНОЕ ХРАНЕНИЕ
+// ============================================================
+function saveDraft() {
+  const data = {};
+  for (const id of INPUTS) data[id] = document.getElementById(id).value;
+  localStorage.setItem('offer_calc_draft', JSON.stringify(data));
+}
+function loadDraft() {
+  const raw = localStorage.getItem('offer_calc_draft');
+  if (!raw) return;
+  try {
+    const data = JSON.parse(raw);
+    for (const id of INPUTS) if (data[id] !== undefined) document.getElementById(id).value = data[id];
+  } catch (e) { /* ignore */ }
+}
+
+function saveSnapshot() {
+  const name = document.getElementById('f_name').value.trim() || ('Без имени ' + new Date().toLocaleString('ru-RU'));
+  const data = {};
+  for (const id of INPUTS) data[id] = document.getElementById(id).value;
+  const snapshots = JSON.parse(localStorage.getItem('offer_calc_snapshots') || '[]');
+  snapshots.push({ name, savedAt: new Date().toISOString(), data });
+  localStorage.setItem('offer_calc_snapshots', JSON.stringify(snapshots));
+  alert('Сохранено: ' + name + '\nВсего расчётов: ' + snapshots.length);
+}
+
+function resetAll() {
+  if (!confirm('Очистить все поля?')) return;
+  for (const id of INPUTS) {
+    const el = document.getElementById(id);
+    el.value = id === 'f_tax_pct' ? '12' : (id === 'f_kc_cross' ? '0' : '');
+  }
+  recalc();
+}
+
+function exportJSON() {
+  const data = {};
+  for (const id of INPUTS) data[id] = document.getElementById(id).value;
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = (data.f_name || 'offer') + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+// ============================================================
+//   ИНИЦИАЛИЗАЦИЯ
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  loadDraft();
+  for (const id of INPUTS) {
+    document.getElementById(id).addEventListener('input', recalc);
+  }
+
+  // Ручное изменение «Выкуп %» — пересчитываем выкуп и выручку,
+  // зафиксировав текущий средний чек как опорный
+  document.getElementById('o_redeem_pct').addEventListener('input', () => {
+    const newPct = num('o_redeem_pct');
+    const apruvy = num('f_orders');
+    if (apruvy <= 0 || newPct <= 0) return;
+
+    // Текущий средний чек (до пересчёта) — это «цена выкупленного заказа»,
+    // которая не должна меняться при сдвиге выкупа
+    const curRedeemed = num('f_redeemed');
+    const curRevenue  = num('f_revenue');
+    const avgCheckNow = curRedeemed > 0 ? curRevenue / curRedeemed : 0;
+
+    const newRedeemed = Math.round(apruvy * newPct / 100);
+    const newRevenue  = Math.round(avgCheckNow * newRedeemed);
+
+    document.getElementById('f_redeemed').value = newRedeemed;
+    document.getElementById('f_revenue').value  = newRevenue;
+
+    lockRedeemPct = true;
+    recalc();
+    lockRedeemPct = false;
+  });
+
+  recalc();
+});
+</script>
+</body>
+</html>
